@@ -54,7 +54,7 @@ module RPG
       #set_tileをサブクラスで用意すること
       ############################################
       
-      attr_reader :refreshable
+      attr_reader :refreshable, :name
       
       #継承されたらTileSetもじゅーるに保存する
       def self.inherited(subclass)
@@ -62,7 +62,17 @@ module RPG
       end
       
       #タイルセット画像を渡して生成
-      def initialize(image)
+      def initialize(image, name)
+        begin
+          TileSet.method(name)
+          raise RPGError, "TileSet has method `#{name}' already", caller(1)
+        rescue NameError
+        end
+        
+        tmp = self
+        TileSet.singleton_class.__send__(:define_method, name){tmp}
+        @name = name.to_sym
+        
         @tile = [] #タイル配列
         set_tile(@image = image) #タイルを配列にセット
         
@@ -238,18 +248,20 @@ module RPG
         Marshal.dump(
                      {image:  @image,
                      tile:   @tile,
-                     change: @change}
+                     change: @change,
+                     name: @name}
                      )
       end
       
       def marshal_load(str)
-        require 'zlib'
-        
         hash = Marshal.load(str)
         
         @image  = hash[:image]
         @tile   = hash[:tile]
         @change = hash[:change]
+        @name   = hash[:name]
+        tmp = self
+        TileSet.singleton_class.__send__(:define_method, @name){tmp}
         
         @initialized = true #初期化終了したと見なす
         #↓
@@ -281,6 +293,10 @@ module RPG
         
         @symbol_ary = @image_ary = nil
         @sleeping = true #機能停止中かどうか/最初は止めておく
+      end
+      
+      def inspect
+        "\#<#{self.class.name}:0x#{self.object_id.to_s(16)} (size: #{size})>"
       end
       
       private
@@ -437,6 +453,10 @@ module RPG
         @tilesets
       end
       
+      def name
+        @tilesets.map(&:name)
+      end
+      
       def sleep
         return if @sleeping
         
@@ -458,11 +478,11 @@ module RPG
       end
       
       def marshal_dump
-        Marshal.dump(@tilesets)
+        Marshal.dump(name)
       end
       
       def marshal_load(str)
-        self.__send__(:initialize, *Marshal.load(str))
+        self.__send__(:initialize, *Marshal.load(str).map{|sym| TileSet.__send__(sym)})
       end
     end
     

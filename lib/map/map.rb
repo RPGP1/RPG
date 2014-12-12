@@ -198,6 +198,35 @@ module RPG
         @tileset.symbol_ary
       end
       
+      def marshal_dump
+        require 'zlib'
+        
+        Zlib::Deflate.deflate(
+                              Marshal.dump(
+                                           {tileset: @tileset.name,
+                                           map: @map,
+                                           info: @info,
+                                           loop: @loop,
+                                           }
+                                           )
+                              )
+      end
+      
+      def marshal_load(str)
+        require 'zlib'
+        
+        hash = Marshal.load(Zlib::Inflate.inflate(str))
+        
+        tileset = hash[:tileset]
+        @tileset = (Array === tileset ? tileset.map{|sym| TileSet.__send__(sym)}.inject(:+) : TileSet.__send__(tileset))
+        @map = hash[:map]
+        @info = hash[:info]
+        @loop = hash[:loop]
+        
+        @width = @map[:lower][0].size
+        @height = @map[:lower].size
+      end
+      
       private
       def stack_autotile(layer, x, y)
         @stacked_autotile ||= []

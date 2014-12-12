@@ -10,7 +10,7 @@ How to Use
 
 libフォルダのトップに位置するrpg.rbを`require`して下さい。
 
-その際、DXRubyをrequire出来るようにしていないとErrorになります。また、DXRubyは自動でrequireされるので、自分でDXRubyを`require_relative`するとエラーになります。(`require`なら2回目以降は無視されるので大丈夫です)
+その際、DXRubyをrequire出来るようにしていないとErrorになります。また、DXRubyは自動で`require`されるので、自分でDXRubyを`require_relative`するとエラーになります。(`require`なら2回目以降は無視されるので大丈夫です。)
 
 Caution!
 ---

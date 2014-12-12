@@ -2,41 +2,41 @@
 
 require_relative './direction'
 
-module RPG
-  module DXRuby
-    class Image
-      def self.dispose(*args)
-        args.each do |obj|
-          if Array === obj
-            self.dispose(*obj) unless obj.empty?
-          else
-            next unless obj.respond_to?(:dispose)
-            (next if obj.disposed?) if obj.respond_to?(:disposed?)
-            obj.dispose
-          end
+module DXRuby
+  class Image
+    def self.dispose(*args)
+      args.each do |obj|
+        if Array === obj
+          self.dispose(*obj) unless obj.empty?
+        else
+          next unless obj.respond_to?(:dispose)
+          (next if obj.disposed?) if obj.respond_to?(:disposed?)
+          obj.dispose
         end
-        
-        nil
       end
-    end
-    
-    class RenderTarget
-      def self.dispose(*args)
-        args.each do |obj|
-          if Array === obj
-            self.dispose(*obj) unless obj.empty?
-          else
-            next unless obj.respond_to?(:dispose)
-            (next if obj.disposed?) if obj.respond_to?(:disposed?)
-            obj.dispose
-          end
-        end
-        
-        nil
-      end
+      
+      nil
     end
   end
   
+  class RenderTarget
+    def self.dispose(*args)
+      args.each do |obj|
+        if Array === obj
+          self.dispose(*obj) unless obj.empty?
+        else
+          next unless obj.respond_to?(:dispose)
+          (next if obj.disposed?) if obj.respond_to?(:disposed?)
+          obj.dispose
+        end
+      end
+      
+      nil
+    end
+  end
+end
+
+module RPG
   module Tile
     class Base
       #全てのタイルの基本
@@ -107,7 +107,7 @@ module RPG
         
         info = @info.inspect
         
-        "#<" + cname + ":" + id + " " + symbol + " (layer:" + rayer + " info:" + info + ")>"
+        "\#<" + cname + ":" + id + " " + symbol + " (layer:" + rayer + " info:" + info + ")>"
       end
       
       private
