@@ -8,7 +8,7 @@
 How to Use
 ---
 
-フォルダ階層のトップに位置するrpg.rbをrequireして下さい。
+libフォルダのトップに位置するrpg.rbをrequireして下さい。
 
 その際、DXRubyをrequire出来るようにしていないとErrorになります。また、自動でrequireするので自分でDXRubyをrequireしない方が良いと思います。
 
