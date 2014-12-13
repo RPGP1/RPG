@@ -8,6 +8,7 @@ module RPG
     @@current_map = nil
     @@target = nil
     @@draw_z = {lower: -30, middle: -20, upper: -10, high: 10}
+    @@map_objects = []
     
     def self.new(width, height, tileset, name)
       begin
@@ -16,6 +17,15 @@ module RPG
         e.set_backtrace(e.backtrace[2..-1])
         raise e
       end
+    end
+    
+    def self.<<(map)
+      return unless Base === map
+      singleton_class.__send__(:define_method, map.name){map}
+      @@map_objects << map.name
+    end
+    def self.map_objects
+      @@map_objects.dup
     end
     
     def self.set(map)
@@ -44,6 +54,17 @@ module RPG
       
       @@layer = [:lower, :middle, :upper, :high]
       
+      #dataファイル内のMapデータを読み込む
+      def self.load_data
+        Dir.chdir(File.dirname(__FILE__)) do
+          Dir['../../data/map/*.map'].each do |fname|
+            Marshal.load(File.binread(fname))
+          end
+        end
+        
+        nil
+      end
+      
       def initialize(width, height, tileset, name)
         raise RPGError, "invalid size", caller(1) if width <= 0 || height <= 0
         @tileset = tileset
@@ -57,8 +78,8 @@ module RPG
         rescue NameError
         end
         
-        tmp = self
-        Map.singleton_class.__send__(:define_method, name){tmp}
+        @name = name
+        Map << self
         @name = name.to_sym
         
         @map = {}
@@ -208,6 +229,13 @@ module RPG
         @tileset.symbol_ary
       end
       
+      def save
+        Dir.chdir(File.dirname(__FILE__)) do
+          File.binwrite('../../data/map/' + @name.to_s + '.map', Marshal.dump(self))
+        end
+        nil
+      end
+      
       def marshal_dump
         require 'zlib'
         
@@ -231,8 +259,7 @@ module RPG
         tileset = hash[:tileset]
         @tileset = (Array === tileset ? tileset.map{|sym| TileSet.__send__(sym)}.inject(:+) : TileSet.__send__(tileset))
         @name = hash[:name]
-        tmp = self
-        Map.singleton_class.__send__(:define_method, @name){tmp}
+        Map << self
         @map = hash[:map]
         @info = hash[:info]
         @loop = hash[:loop]

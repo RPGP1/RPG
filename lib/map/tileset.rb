@@ -8,7 +8,9 @@ module RPG
     @@tileset_classes = []
     @@tileset_objects = []
     def self.<<(tileset)
-      @@tileset_classes << tileset if Class === tileset
+      if Class === tileset
+        @@tileset_classes << tileset if Base >= tileset
+      end
       if Base === tileset
         singleton_class.__send__(:define_method, tileset.name){tileset}
         @@tileset_objects << tileset.name
@@ -69,7 +71,7 @@ module RPG
         TileSet << subclass
       end
       
-      #dataファイル内のTileSetBaseデータを読み込む
+      #dataファイル内のTileSetデータを読み込む
       def self.load_data
         Dir.chdir(File.dirname(__FILE__)) do
           Dir['../../data/tileset/*.tileset'].each do |fname|
