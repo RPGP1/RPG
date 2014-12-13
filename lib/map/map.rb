@@ -9,9 +9,9 @@ module RPG
     @@target = nil
     @@draw_z = {lower: -30, middle: -20, upper: -10, high: 10}
     
-    def self.new(width, height, tileset)
+    def self.new(width, height, tileset, name)
       begin
-        Base.new(width, height, tileset)
+        Base.new(width, height, tileset, name)
       rescue => e
         e.set_backtrace(e.backtrace[2..-1])
         raise e
@@ -40,16 +40,26 @@ module RPG
     end
     
     class Base
-      attr_reader :loop
+      attr_reader :loop, :name
       
       @@layer = [:lower, :middle, :upper, :high]
       
-      def initialize(width, height, tileset)
+      def initialize(width, height, tileset, name)
         raise RPGError, "invalid size", caller(1) if width <= 0 || height <= 0
         @tileset = tileset
         
         @width = width
         @height = height
+        
+        begin
+          Map.method(name)
+          raise RPGError, "TileSet has method `#{name}' already", caller(1)
+        rescue NameError
+        end
+        
+        tmp = self
+        Map.singleton_class.__send__(:define_method, name){tmp}
+        @name = name.to_sym
         
         @map = {}
         @info = {}
@@ -204,6 +214,7 @@ module RPG
         Zlib::Deflate.deflate(
                               Marshal.dump(
                                            {tileset: @tileset.name,
+                                           name: @name,
                                            map: @map,
                                            info: @info,
                                            loop: @loop,
@@ -219,12 +230,19 @@ module RPG
         
         tileset = hash[:tileset]
         @tileset = (Array === tileset ? tileset.map{|sym| TileSet.__send__(sym)}.inject(:+) : TileSet.__send__(tileset))
+        @name = hash[:name]
+        tmp = self
+        Map.singleton_class.__send__(:define_method, @name){tmp}
         @map = hash[:map]
         @info = hash[:info]
         @loop = hash[:loop]
         
         @width = @map[:lower][0].size
         @height = @map[:lower].size
+      end
+      
+      def inspect
+        "\#<#{self.class}:0x#{self.object_id.to_s(16)} #{@width} * #{@height} (tileset:#{@tileset})}>"
       end
       
       private

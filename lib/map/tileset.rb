@@ -6,11 +6,19 @@ module RPG
   module TileSet
     #TileSet::Baseを継承したクラスを自動で保持
     @@tileset_classes = []
+    @@tileset_objects = []
     def self.<<(tileset)
-      @@tileset_classes << tileset
+      @@tileset_classes << tileset if Class === tileset
+      if Base === tileset
+        singleton_class.__send__(:define_method, tileset.name){tileset}
+        @@tileset_objects << tileset.name
+      end
     end
     def self.tileset_classes
       @@tileset_classes.dup
+    end
+    def self.tileset_objects
+      @@tileset_objects.dup
     end
     
     #画像を持っているTileSetを保持
@@ -56,9 +64,20 @@ module RPG
       
       attr_reader :refreshable, :name
       
-      #継承されたらTileSetもじゅーるに保存する
+      #継承されたらTileSetモジュールに保存する
       def self.inherited(subclass)
         TileSet << subclass
+      end
+      
+      #dataファイル内のTileSetBaseデータを読み込む
+      def self.load_data
+        Dir.chdir(File.dirname(__FILE__)) do
+          Dir['../../data/tileset/*.tileset'].each do |fname|
+            Marshal.load(File.binread(fname))
+          end
+        end
+        
+        nil
       end
       
       #タイルセット画像を渡して生成
@@ -69,8 +88,8 @@ module RPG
         rescue NameError
         end
         
-        tmp = self
-        TileSet.singleton_class.__send__(:define_method, name){tmp}
+        @name = name
+        TileSet << self
         @name = name.to_sym
         
         @tile = [] #タイル配列
@@ -241,6 +260,13 @@ module RPG
         nil
       end
       
+      def save
+        Dir.chdir(File.dirname(__FILE__)) do
+          File.binwrite('../../data/tileset/' + @name.to_s + '.tileset', Marshal.dump(self))
+        end
+        nil
+      end
+      
       #Marshal対応
       def marshal_dump
         require 'zlib'
@@ -260,8 +286,7 @@ module RPG
         @tile   = hash[:tile]
         @change = hash[:change]
         @name   = hash[:name]
-        tmp = self
-        TileSet.singleton_class.__send__(:define_method, @name){tmp}
+        TileSet << self
         
         @initialized = true #初期化終了したと見なす
         #↓
@@ -281,9 +306,9 @@ module RPG
         if @refreshable = !refreshable_ary.empty?
           @refreshable_ary = refreshable_ary
           def refresh
-            return if @before != (@before = Window.running_time)
+            return if @before == (@before = Window.running_time)
             @refreshable_ary.each(&:refresh)
-            @refreshed = @refreshable_ary.any?(&:refresjed?)
+            @refreshed = @refreshable_ary.any?(&:refreshed?)
           end
           
           def refreshed?
@@ -312,14 +337,15 @@ module RPG
           return tile #返す
         end
         
+        @cycle ||= @tile.cycle
         #awake中なら:awake
         #marshal_load中なら:set_layer
-        call_for = {true => :awake, nil => :set_layer}
-        
-        @cycle ||= @tile.cycle
-        
         tile = @cycle.next
-        tile.__send__(call_for[@sleeping], img, **opt)
+        if @sleeping
+          tile.awake(img, **opt)
+        else
+          tile.__send__(:set_layer, **opt)
+        end
         
         return tile
       end
@@ -475,14 +501,6 @@ module RPG
         @sleeping = false
         
         nil
-      end
-      
-      def marshal_dump
-        Marshal.dump(name)
-      end
-      
-      def marshal_load(str)
-        self.__send__(:initialize, *Marshal.load(str).map{|sym| TileSet.__send__(sym)})
       end
     end
     

@@ -1,5 +1,7 @@
 *.gem
 *.rbc
+*.tileset
+*.map
 /.config
 /coverage/
 /InstalledFiles

@@ -47,7 +47,7 @@ module RPG
       #       AutotileTile, SetPatternTile, WaterFallTile, OneImageTile
       ############################################
       
-      attr_reader :symbol, :image, :size, :layer, :info, :refreshable
+      attr_reader :symbol, :image, :size, :layer, :info
       
       def initialize(**opt)
         @info = {}
@@ -55,12 +55,16 @@ module RPG
         set_layer(**opt) #層を設定
         set_info(**opt)
         
-        @refreshable = false
+        @info[:refreshable] = false
       end
       
       #tileが周囲に配置された時、selfを同じタイルとみなすか
       def ===(tile)
         self == tile
+      end
+      
+      def refreshable
+        @info[:refreshable]
       end
       
       #メモリ節約のため、使用しない時はsleepしておく
@@ -476,52 +480,50 @@ module RPG
       def initialize(animation_count, **opt)
         super(**opt)
         
-        return unless animation_count > 1
+        @info[:refreshable] = true
+        @info[:default_animation_count] = animation_count
+      end
+      
+      def set_image(image, **opt)
+        @symbol_image_ary = [] #@symbol, @imageに使用する画像の配列
         
-        @refreshable = true
-        @default_animation_count = animation_count
-        
-        def set_image(image, **opt)
-          @symbol_image_ary = [] #@symbol, @imageに使用する画像の配列
+        image.each do |img| #渡された画像を順に
+          super(img, **opt) #autotileとして処理
           
-          image.each do |img| #渡された画像を順に
-            super(img, **opt) #autotileとして処理
-            
-            @symbol_image_ary << [@symbol, @image] #配列にそのまま追加
-          end
-          
-          @symbol_image_cycle = @symbol_image_ary.cycle
-          @symbol, @image = @symbol_image_cycle.next
-          
-          @animation_count = @default_animation_count
-          @refreshed = false
-          
-          self
+          @symbol_image_ary << [@symbol, @image] #配列にそのまま追加
         end
         
-        def refresh
-          @refreshed = false
-          @animation_count -= 1
-          return if @animation_count > 0
-          
-          @animation_count = @default_animation_count
-          
-          @symbol, @image = @symbol_image_cycle.next
-          @refreshed = true
-          
-          nil
-        end
+        @symbol_image_cycle = @symbol_image_ary.cycle
+        @symbol, @image = @symbol_image_cycle.next
         
-        def refreshed?
-          @refreshed
-        end
+        @animation_count = @info[:default_animation_count]
+        @refreshed = false
         
-        def sleep
-          Image.dispose(*@symbol_image_ary)
-          @symbol = @image = @symbol_image_cycle = @symbol_image_ary = nil
-          
-          nil
-        end
+        self
+      end
+      
+      def refresh
+        @refreshed = false
+        @animation_count -= 1
+        return if @animation_count > 0
+        
+        @animation_count = @info[:default_animation_count]
+        
+        @symbol, @image = @symbol_image_cycle.next
+        @refreshed = true
+        
+        nil
+      end
+      
+      def refreshed?
+        @refreshed
+      end
+      
+      def sleep
+        Image.dispose(*@symbol_image_ary)
+        @symbol = @image = @symbol_image_cycle = @symbol_image_ary = nil
+        
+        nil
       end
     end
     
