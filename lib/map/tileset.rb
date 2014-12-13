@@ -123,8 +123,6 @@ module RPG
           end
         end
         
-        #後から変更した画像
-        @change = {symbol: {}, image: {}}
         @symbol_ary = @image_ary = nil
         
         @initialized = true
@@ -146,10 +144,6 @@ module RPG
         
         #無ければタイル配列から取り出す
         @symbol_ary = @tile.map(&:symbol)
-        #変更が有れば反映
-        @change[:symbol].each_pair do |i, img|
-          @symbol_ary[i] = img
-        end
         
         @symbol_ary
       end
@@ -168,10 +162,6 @@ module RPG
         
         #無ければタイル配列から取り出す
         @image_ary = @tile.flat_map(&:image)
-        #変更が有れば反映
-        @change[:image].each_pair do |i, img|
-          @image_ary[i] = img
-        end
         
         @image_ary
       end
@@ -208,23 +198,6 @@ module RPG
           return unless tile_i == 0
           return ary.size
         end
-      end
-      
-      def replace_image(tile, tile_i, image, type: :image)
-        return unless ary = @change[type]
-        return i = index(tile, tile_i, type: type)
-        
-        ary[i] = image
-        return self if @sleeping
-        
-        case type
-        when :image
-          @image_ary[i] = image
-        when :symbol
-          @symbol_ary[i] = image
-        end
-        
-        self
       end
       
       def +(other)
@@ -276,7 +249,6 @@ module RPG
         Marshal.dump(
                      {image:  @image,
                      tile:   @tile,
-                     change: @change,
                      name: @name}
                      )
       end
@@ -286,7 +258,6 @@ module RPG
         
         @image  = hash[:image]
         @tile   = hash[:tile]
-        @change = hash[:change]
         @name   = hash[:name]
         TileSet << self
         
@@ -471,10 +442,6 @@ module RPG
         self.__send__(:initialize, *@tilesets, *other.to_a)
         
         self
-      end
-      
-      def replace_image(tile, tile_i, image, type: :image)
-        @tilesets.find{|ts| ts.replace_image(tile, tile_i, image, type: type)} ? self : nil
       end
       
       def to_a
