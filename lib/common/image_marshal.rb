@@ -4,7 +4,7 @@
 
 module DXRuby
   class Image
-    def marshal_dump
+    def to_binary
       require 'zlib'
       
       image_data = []
@@ -24,6 +24,8 @@ module DXRuby
       chunk("IDAT", Zlib::Deflate.deflate(image_data.pack("C*"))) + 
       chunk("IEND", "")
     end
+    
+    alias :marshal_dump :to_binary
     
     def marshal_load(str)
       img = Image.loadFromFileInMemory(str)
