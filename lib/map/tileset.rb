@@ -22,6 +22,11 @@ module RPG
     def self.tileset_objects
       @@tileset_objects.dup
     end
+    def self.[](name)
+      name = name.to_sym
+      return unless @@tileset_objects.include?(name)
+      self.__send__(name)
+    end
     
     #画像を持っているTileSetを保持
     #TileSetが一定数起きたら眠らせる
@@ -74,7 +79,7 @@ module RPG
       #dataファイル内のTileSetデータを読み込む
       def self.load_data
         Dir.chdir(File.dirname(__FILE__)) do
-          Dir['../../data/tileset/*.tileset'].each do |fname|
+          Dir['../../data/map/tileset/*.tileset'].each do |fname|
             Marshal.load(File.binread(fname))
           end
         end
@@ -84,11 +89,7 @@ module RPG
       
       #タイルセット画像を渡して生成
       def initialize(image, name)
-        begin
-          TileSet.method(name)
-          raise RPGError, "TileSet has method `#{name}' already", caller(1)
-        rescue NameError
-        end
+        raise RPGError, "TileSet has method `#{name}' already", caller(1) if TileSet.respond_to?(name, true)
         
         @name = name
         TileSet << self
@@ -237,7 +238,7 @@ module RPG
       
       def save
         Dir.chdir(File.dirname(__FILE__)) do
-          File.binwrite('../../data/tileset/' + @name.to_s + '.tileset', Marshal.dump(self))
+          File.binwrite('../../data/map/tileset/' + @name.to_s + '.tileset', Marshal.dump(self))
         end
         nil
       end

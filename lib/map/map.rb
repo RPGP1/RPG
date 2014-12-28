@@ -27,6 +27,11 @@ module RPG
     def self.map_objects
       @@map_objects.dup
     end
+    def self.[](name)
+      name = name.to_sym
+      return unless @@map_objects.include?(name)
+      self.__send__(name)
+    end
     
     def self.set(map)
       raise RPGError, "unexpected #{map.class} object, expected #{Base} object", caller(1) unless Base === map
@@ -57,7 +62,7 @@ module RPG
       #dataファイル内のMapデータを読み込む
       def self.load_data
         Dir.chdir(File.dirname(__FILE__)) do
-          Dir['../../data/map/*.map'].each do |fname|
+          Dir['../../data/map/map/*.map'].each do |fname|
             Marshal.load(File.binread(fname))
           end
         end
@@ -72,11 +77,7 @@ module RPG
         @width = width
         @height = height
         
-        begin
-          Map.method(name)
-          raise RPGError, "TileSet has method `#{name}' already", caller(1)
-        rescue NameError
-        end
+        raise RPGError, "TileSet has method `#{name}' already", caller(1) if Map.respond_to?(name, true)
         
         @name = name
         Map << self
@@ -231,7 +232,7 @@ module RPG
       
       def save
         Dir.chdir(File.dirname(__FILE__)) do
-          File.binwrite('../../data/map/' + @name.to_s + '.map', Marshal.dump(self))
+          File.binwrite('../../data/map/map/' + @name.to_s + '.map', Marshal.dump(self))
         end
         nil
       end
