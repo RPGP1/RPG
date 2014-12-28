@@ -1,5 +1,5 @@
 *.gem
-*.rbc
+old_*
 *.tileset
 *.map
 /.config
