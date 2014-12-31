@@ -161,7 +161,7 @@ module RPG
         
         @info[:move] = Direction.new(true)
         #:move 地上系のみに影響。移動できる方向のDirection
-        #      Directionクラスについては./common.rbを参照
+        #      Directionクラスについては./direction.rbを参照
         
         self
       end
