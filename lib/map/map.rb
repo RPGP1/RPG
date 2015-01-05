@@ -270,7 +270,7 @@ module RPG
       end
       
       def inspect
-        "\#<#{self.class}:0x#{self.object_id.to_s(16)} #{@width} * #{@height} (tileset:#{@tileset})}>"
+        "\#<#{self.class}:0x#{self.object_id.to_s(16)} #{self.name.to_s} #{@width} * #{@height} (tileset:#{@tileset})}>"
       end
       
       private

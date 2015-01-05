@@ -114,7 +114,7 @@ module RPG
           @refreshable = true
           @refreshable_ary = refreshable_ary
           def refresh
-            return if @before == (@before = Window.running_time)
+            return if @before == (@before = (Window.created? ? Window.running_time : 0.0))
             @refreshable_ary.each(&:refresh)
             @refreshed = @refreshable_ary.any?(&:refreshed?)
           end
@@ -280,7 +280,7 @@ module RPG
         if @refreshable = !refreshable_ary.empty?
           @refreshable_ary = refreshable_ary
           def refresh
-            return if @before == (@before = Window.running_time)
+            return if @before == (@before = (Window.created? ? Window.running_time : 0.0))
             @refreshable_ary.each(&:refresh)
             @refreshed = @refreshable_ary.any?(&:refreshed?)
           end
@@ -295,7 +295,7 @@ module RPG
       end
       
       def inspect
-        "\#<#{self.class.name}:0x#{self.object_id.to_s(16)} (size: #{size})>"
+        "\#<#{self.class.name}:0x#{self.object_id.to_s(16)} #{self.name.to_s} (size: #{size})>"
       end
       
       private
@@ -356,7 +356,7 @@ module RPG
           @refreshable = true
           @refreshable_ary = refreshable_ary
           def refresh
-            return if @before == (@before = Window.running_time)
+            return if @before == (@before = (Window.created? ? Window.running_time : 0.0))
             @refreshable_ary.each(&:refresh)
             @refreshed = @refreshable_ary.any?(&:refreshed?)
           end
