@@ -419,7 +419,7 @@ module RPG
       @@part = [[0, 3], #孤立
         [0, 1], #右だけ
         [2, 3], #左だけ
-        [1, 2]] #左右
+        [2, 1]] #左右
       
       def index(ary)
         result = 0
@@ -439,7 +439,6 @@ module RPG
         width = part_width * 2
         height = ary[0].height
         
-        @symbol = image.slice(0,0,width,height)
         @image = @@part.map{|part|
           img = Image.new(width, height)
           part.each.with_index{|index, i|
@@ -447,6 +446,7 @@ module RPG
           }
           img
         }
+        @symbol = @image[0]
         
         [@symbol, @image]
       end
