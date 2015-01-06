@@ -372,7 +372,6 @@ module TileSetEditor
       
       def initialize(tileset)
         super()
-        self.image.bgcolor = [0,0,0]
         @render_range = Sprite.new
         
         @tileset = tileset
@@ -460,6 +459,14 @@ module TileSetEditor
       client.info_render(&b)
     end
     
+    def bgcolor
+      client.bgcolor
+    end
+    
+    def bgcolor=(v)
+      client.bgcolor = v
+    end
+    
     def render
       client.pos = vsb.pos
       super
@@ -499,16 +506,17 @@ module TileSetEditor
   end
   
   class EditTilePreview < WS::WSImage
-    def initialize(viewer, tw, th, bgcolor, scale = 1)
+    def initialize(viewer, tw, th, scale = 1)
       super(nil, nil, nil, th * scale + 4)
       self.image = RenderTarget.new(tw * scale + 4, th * scale + 4)
-      self.image.bgcolor = bgcolor
       
       @viewer = viewer
       @scale = scale
     end
     
     def render
+      self.image.bgcolor = @viewer.tile_bgcolor
+      
       self.image.draw_box(0,0,self.image.width - 1, self.image.height - 1, C_WHITE)
       if img = @viewer.symbol_img
         if @scale == 1
@@ -523,12 +531,22 @@ module TileSetEditor
   end
   
   class EditModeBase < WS::WSLightContainer
-    attr_reader :name
+    attr_reader :name, :tile_bgcolor
+    
+    @@tile_bgcolor = [0,0,0]
+    
+    def self.tile_bgcolor
+      @@tile_bgcolor
+    end
+    def self.tile_bgcolor=(v)
+      @@tile_bgcolor = v
+    end
     
     def initialize(name)
       super()
       @name = name
       @focusable = true
+      @tile_bgcolor = @@tile_bgcolor
       
       #ここに本体を入れる
       @main_area = nil
@@ -551,17 +569,17 @@ module TileSetEditor
       @tileset = tileset
       
       tilesetview = add_control(TileSetView.new(tileset), :tilesetview)
+      tilesetview.bgcolor = @tile_bgcolor
       unless old_tileset
         add_handler(:mouse_wheel_up){self.tilesetview.vsb.slide(-self.tilesetview.vsb.shift_qty * 3)}
         add_handler(:mouse_wheel_down){self.tilesetview.vsb.slide(self.tilesetview.vsb.shift_qty * 3)}
+        init_editor
       end
-      
-      yield if block_given?
+      tilesetview.info_render(&(@info_render ||= Proc.new{}))
       
       main_area = @main_area
       if main_area
         add_control(@main_area, :main_area)
-        main_area.focusable = true
       end
       
       layout(:hbox) do
@@ -571,8 +589,26 @@ module TileSetEditor
         add tilesetview
         main_area ? (add main_area) : layout
       end
+    end
+    
+    def init_editor
+      def tile
+        tilesetview.tile
+      end
+      def symbol_img
+        tilesetview.symbol_img
+      end
       
-      main_area.activate if main_area
+      def try_change(name)
+        change(tile, name) if tile
+      end
+      
+      def change(t, name)
+      end
+    end
+    
+    def tile_bgcolor=(v)
+      tilesetview.bgcolor = @tile_bgcolor = v
     end
   end
   
@@ -581,72 +617,54 @@ module TileSetEditor
       super('通行設定')
     end
     
-    def set_tileset(tileset)
-      #タイルセットが選択されていないなら何もしない
-      return unless tileset
+    def init_editor
+      super
       
-      old_tileset = @tileset
-      super do
-        next if old_tileset
+      timg = @tileset.symbol_ary
+      tw = timg[0].width
+      th = timg[0].height
+      
+      image1 = EditTilePreview.new(self, tw, th)
+      image2 = EditTilePreview.new(self, tw, th, 3)
+      
+      space_ctl = WS::WSControl.new(nil,nil,nil, 5)
+      
+      label1 = EditBoolLabel.new(self, :pass, '通行', :boat, '小舟')
+      label2 = EditBoolLabel.new(self, :pass, '通行', :ship, '船舶')
+      label3 = EditBoolLabel.new(self, :pass, '通行', :float, '浮遊')
+      label4 = EditBoolLabel.new(self, :pass, '通行', :plane, '飛行機')
+      
+      @main_area = WS::WSLightContainer.new
+      @main_area.add_control(image1)
+      @main_area.add_control(image2)
+      @main_area.add_control(space_ctl)
+      @main_area.add_control(label1)
+      @main_area.add_control(label2)
+      @main_area.add_control(label3)
+      @main_area.add_control(label4)
+      @main_area.layout(:vbox) do
+        self.set_margin 2, 2, 2, 2
+        self.space = 5
         
-        timg = tileset.symbol_ary
-        tw = timg[0].width
-        th = timg[0].height
-        
-        def tile
-          tilesetview.tile
-        end
-        def symbol_img
-          tilesetview.symbol_img
-        end
-        
-        image1 = EditTilePreview.new(self, tw, th, tilesetview.client.bgcolor)
-        image2 = EditTilePreview.new(self, tw, th, tilesetview.client.bgcolor, 3)
-        
-        space_ctl = WS::WSControl.new(nil,nil,nil, 5)
-        
-        label1 = EditBoolLabel.new(self, :pass, '通行', :walk, '歩行')
-        label2 = EditBoolLabel.new(self, :pass, '通行', :boat, '小舟')
-        label3 = EditBoolLabel.new(self, :pass, '通行', :ship, '船舶')
-        label4 = EditBoolLabel.new(self, :pass, '通行', :float, '浮遊')
-        label5 = EditBoolLabel.new(self, :pass, '通行', :plane, '飛行機')
-        
-        @main_area = WS::WSLightContainer.new
-        @main_area.add_control(image1)
-        @main_area.add_control(image2)
-        @main_area.add_control(space_ctl)
-        @main_area.add_control(label1)
-        @main_area.add_control(label2)
-        @main_area.add_control(label3)
-        @main_area.add_control(label4)
-        @main_area.add_control(label5)
-        @main_area.layout(:vbox) do
-          self.set_margin 2, 2, 2, 2
-          self.space = 5
-          
-          add image1
-          add image2
-          add space_ctl
-          add label1
-          add label2
-          add label3
-          add label4
-          add label5
-          layout
-        end
-        
-        def change_pass(name)
-          return unless tile
-          ary = tile.info[:pass]
-          ary << name unless ary.delete(name)
-        end
-        
-        add_key_handler(K_Q){change_pass(:walk)}
-        add_key_handler(K_W){change_pass(:boat)}
-        add_key_handler(K_E){change_pass(:ship)}
-        add_key_handler(K_R){change_pass(:float)}
-        add_key_handler(K_T){change_pass(:plane)}
+        add image1
+        add image2
+        add space_ctl
+        add label1
+        add label2
+        add label3
+        add label4
+        layout
       end
+      
+      def change(t, name)
+        ary = t.info[:pass]
+        ary << name unless ary.delete(name)
+      end
+      
+      add_key_handler(K_Q){try_change(:boat)}
+      add_key_handler(K_W){try_change(:ship)}
+      add_key_handler(K_E){try_change(:float)}
+      add_key_handler(K_R){try_change(:plane)}
     end
   end
   
@@ -655,64 +673,159 @@ module TileSetEditor
       super('着陸設定')
     end
     
-    def set_tileset(tileset)
-      #タイルセットが選択されていないなら何もしない
-      return unless tileset
+    def init_editor
+      super
       
-      old_tileset = @tileset
-      super do
-        next if old_tileset
+      timg = @tileset.symbol_ary
+      tw = timg[0].width
+      th = timg[0].height
+      
+      image1 = EditTilePreview.new(self, tw, th)
+      image2 = EditTilePreview.new(self, tw, th, 3)
+      
+      space_ctl = WS::WSControl.new(nil,nil,nil, 5)
+      
+      label1 = EditBoolLabel.new(self, :land, '着陸', :float, '浮遊')
+      label2 = EditBoolLabel.new(self, :land, '着陸', :plane, '飛行機')
+      
+      @main_area = WS::WSLightContainer.new
+      @main_area.add_control(image1)
+      @main_area.add_control(image2)
+      @main_area.add_control(space_ctl)
+      @main_area.add_control(label1)
+      @main_area.add_control(label2)
+      @main_area.layout(:vbox) do
+        self.set_margin 2, 2, 2, 2
+        self.space = 5
         
-        timg = tileset.symbol_ary
-        tw = timg[0].width
-        th = timg[0].height
-        
-        def tile
-          tilesetview.tile
-        end
-        def symbol_img
-          tilesetview.symbol_img
-        end
-        
-        image1 = EditTilePreview.new(self, tw, th, tilesetview.client.bgcolor)
-        image2 = EditTilePreview.new(self, tw, th, tilesetview.client.bgcolor, 3)
-        
-        space_ctl = WS::WSControl.new(nil,nil,nil, 5)
-        
-        label1 = EditBoolLabel.new(self, :land, '着陸', :float, '浮遊')
-        label2 = EditBoolLabel.new(self, :land, '着陸', :plane, '飛行機')
-        
-        @main_area = WS::WSLightContainer.new
-        @main_area.add_control(image1)
-        @main_area.add_control(image2)
-        @main_area.add_control(space_ctl)
-        @main_area.add_control(label1)
-        @main_area.add_control(label2)
-        @main_area.layout(:vbox) do
-          self.set_margin 2, 2, 2, 2
-          self.space = 5
-          
-          add image1
-          add image2
-          add space_ctl
-          add label1
-          add label2
-          layout
-        end
-        
-        def change_land(name)
-          return unless tile
-          ary = tile.info[:land]
-          ary << name unless ary.delete(name)
-        end
-        
-        add_key_handler(K_R){change_land(:float)}
-        add_key_handler(K_T){change_land(:plane)}
+        add image1
+        add image2
+        add space_ctl
+        add label1
+        add label2
+        layout
       end
+      
+      def change(t, name)
+        ary = t.info[:land]
+        ary << name unless ary.delete(name)
+      end
+      
+      add_key_handler(K_E){try_change(:float)}
+      add_key_handler(K_R){try_change(:plane)}
     end
   end
   
-  class EditWalk < WS::WSLightContainer
+  class EditWalk < EditModeBase
+    class EditDirectionLabel < WS::WSLabel
+      def initialize(viewer, type, type_caption, name, name_caption)
+        @font = @@default_font
+        super(nil,nil,nil, @font.size + 2, name_caption + '：')
+        
+        @viewer = viewer
+        @type = type
+        @type_caption = type_caption
+        @name = name
+        @name_caption = name_caption
+      end
+      
+      def update
+        tile = @viewer.tile
+        if tile
+          self.caption = @name_caption + '：' + @type_caption + (tile.info[@type].__send__(@name) ? '可' : '不可')
+        else
+          self.caption = @name_caption + '：'
+        end
+        
+        super
+      end
+    end
+    
+    def initialize
+      super('歩行設定')
+    end
+    
+    def init_editor
+      super
+      
+      timg = @tileset.symbol_ary
+      tw = timg[0].width
+      th = timg[0].height
+      
+      proc = Proc.new do |tw, th, bold, inside, edge|
+        Image.new(tw, th).triangleFill(tw / 2 - 1, 0, 0, tw / 2 - 1, tw / 2 - 1, tw / 2 - 1, inside)
+        .triangleFill(tw / 2, 0, tw / 2, tw / 2 - 1, tw - 1, tw / 2 - 1, inside)
+        .boxFill((tw - bold) / 2, tw / 2 - 1, (tw + bold - 2) / 2, th - 1, inside)
+        .line(tw / 2 - 1, 0, 0, tw / 2 - 1, edge)
+        .line(0, tw / 2 - 1, (tw - bold) / 2, tw / 2 - 1, edge)
+        .line((tw - bold) / 2, tw / 2 - 1, (tw - bold) / 2, th - 1, edge)
+        .line(tw / 2, 0, tw - 1, tw / 2 - 1, edge)
+        .line(tw - 1, tw / 2 - 1, (tw + bold - 2) / 2, tw / 2 - 1, edge)
+        .line((tw + bold - 2) / 2, tw / 2 - 1, (tw + bold - 2) / 2, th - 1, edge)
+        .line((tw - bold) / 2, th - 1, (tw + bold - 2) / 2, th - 1, edge)
+      end
+      
+      arrow_img = {true => proc.call((th - 2) / 3, th / 2 - 4, 4, C_WHITE, [0,0,0]), false => proc.call((th - 2) / 3, th / 2 - 4, 4, [0,0,0], C_WHITE)}
+      pos_ary = [[(tw * 3 - th + 14) / 6, 3], [tw + 1, (tw * 3 - th + 14) / 6], [(tw * 3 + th + 10) / 6, th + 1], [3, (tw * 3 + th + 10) / 6]]
+      @info_render = Proc.new do
+        img = arrow_img[self.tile.info[:pass].include?(:walk)]
+        pos_ary.each.with_index do |ary, i|
+          next unless self.tile.info[:move].able?(i)
+          self.image.drawRot(*ary, img, 90 * i, 0, 0)
+        end
+      end
+      
+      image1 = EditTilePreview.new(self, tw, th)
+      image2 = EditTilePreview.new(self, tw, th, 3)
+      
+      space_ctl = WS::WSControl.new(nil,nil,nil, 5)
+      
+      label1 = EditBoolLabel.new(self, :pass, '通行', :walk, '歩行')
+      label2 = EditDirectionLabel.new(self, :move, '歩行', :up?, '↑')
+      label3 = EditDirectionLabel.new(self, :move, '歩行', :down?, '↓')
+      label4 = EditDirectionLabel.new(self, :move, '歩行', :left?, '←')
+      label5 = EditDirectionLabel.new(self, :move, '歩行', :right?, '→')
+      
+      @main_area = WS::WSLightContainer.new
+      @main_area.add_control(image1)
+      @main_area.add_control(image2)
+      @main_area.add_control(space_ctl)
+      @main_area.add_control(label1)
+      @main_area.add_control(label2)
+      @main_area.add_control(label3)
+      @main_area.add_control(label4)
+      @main_area.add_control(label5)
+      @main_area.layout(:vbox) do
+        self.set_margin 2, 2, 2, 2
+        self.space = 5
+        
+        add image1
+        add image2
+        add space_ctl
+        add label1
+        add label2
+        add label3
+        add label4
+        add label5
+        layout
+      end
+      
+      def change(t, name)
+        if name == :able
+          ary = t.info[:pass]
+          ary << :walk unless ary.delete(:walk)
+        else
+          direction = t.info[:move]
+          direction.__send__(name.to_s + '=', !direction.__send__(name.to_s + '?'))
+        end
+      end
+      
+      add_key_handler(K_1){try_change(:able)}
+      add_key_handler(K_W){try_change(:up)}
+      add_key_handler(K_S){try_change(:down)}
+      add_key_handler(K_A){try_change(:left)}
+      add_key_handler(K_D){try_change(:right)}
+    end
   end
   
   class EditThrough < WS::WSLightContainer
@@ -766,7 +879,7 @@ module TileSetEditor
   end
   
   @@editing_mode = nil
-  @@editing_controls = {pass: EditPass.new, land: EditLand.new}
+  @@editing_controls = {pass: EditPass.new, land: EditLand.new, walk: EditWalk.new}
   def self.change_mode(mode)
     @@work_area.remove_control(@@editing_controls[@@editing_mode]) if @@editing_controls[@@editing_mode]
     @@editing_mode = mode

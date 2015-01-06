@@ -15,6 +15,20 @@ module RPG
     end
   end
   
+  module RIGHT
+    def self.opposite
+      LEFT
+    end
+    
+    def self.vector
+      [1, 0]
+    end
+    
+    def self.index
+      1
+    end
+  end
+  
   module DOWN
     def self.opposite
       UP
@@ -25,7 +39,7 @@ module RPG
     end
     
     def self.index
-      1
+      2
     end
   end
   
@@ -36,20 +50,6 @@ module RPG
     
     def self.vector
       [-1, 0]
-    end
-    
-    def self.index
-      2
-    end
-  end
-  
-  module RIGHT
-    def self.opposite
-      LEFT
-    end
-    
-    def self.vector
-      [1, 0]
     end
     
     def self.index
@@ -80,7 +80,7 @@ module RPG
     
     def able?(d)
       i = d.respond_to?(:index) ? d.index : d
-      [@up, @down, @left, @right][i]
+      [@up, @right, @down, @left][i]
     end
     
     def inspect
