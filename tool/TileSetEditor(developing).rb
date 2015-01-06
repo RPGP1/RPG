@@ -40,7 +40,7 @@ module TileSetEditor
       
       hash.each do |key, caption|
         str = key.to_s
-        add_control(WS::WSImageButton.new(nil,nil,Image.load('./icon/' + str + '.png')), ('icon_' + str).to_sym).tap{|ctl|
+        add_control(WS::WSImageButton.new(nil,nil,Image.load('./image/tileseteditor/' + str + '.png')), ('icon_' + str).to_sym).tap{|ctl|
           ctl.hover_text = caption
           ctl.add_handler(:click){self.signal(key)}
           hash[key] = ctl
@@ -828,7 +828,80 @@ module TileSetEditor
     end
   end
   
-  class EditThrough < WS::WSLightContainer
+  class EditThrough < EditModeBase
+    class EditThroughLabel < WS::WSLabel
+      def initialize(viewer)
+        @font = @@default_font
+        super(nil,nil,nil, @font.size + 2, 'すり抜け：')
+        
+        @viewer = viewer
+      end
+      
+      def update
+        tile = @viewer.tile
+        if tile
+          if tile.respond_to?(:through=)
+            self.caption = 'すり抜け：' + (tile.through ? 'する' : 'しない')
+          else
+            self.caption = 'すり抜け：設定不可'
+          end
+        else
+          self.caption = 'すり抜け：'
+        end
+        
+        super
+      end
+    end
+    
+    def initialize
+      super('すり抜け設定')
+    end
+    
+    def init_editor
+      super
+      
+      timg = @tileset.symbol_ary
+      tw = timg[0].width
+      th = timg[0].height
+      
+      img_ary = [Image.load('./image/tileseteditor/[].png'), Image.load('./image/tileseteditor/o.png'), Image.load('./image/tileseteditor/x.png'),]
+      @info_render = Proc.new do
+        img = img_ary[
+          self.tile.respond_to?(:through=) ? (self.tile.through ? 1 : 2) : 0
+        ]
+        self.image.draw((self.image.width - img.width) / 2, (self.image.height - img.height) / 2, img)
+      end
+      
+      image1 = EditTilePreview.new(self, tw, th)
+      image2 = EditTilePreview.new(self, tw, th, 3)
+      
+      space_ctl = WS::WSControl.new(nil,nil,nil, 5)
+      
+      label1 = EditThroughLabel.new(self)
+      
+      @main_area = WS::WSLightContainer.new
+      @main_area.add_control(image1)
+      @main_area.add_control(image2)
+      @main_area.add_control(space_ctl)
+      @main_area.add_control(label1)
+      @main_area.layout(:vbox) do
+        self.set_margin 2, 2, 2, 2
+        self.space = 5
+        
+        add image1
+        add image2
+        add space_ctl
+        add label1
+        layout
+      end
+      
+      def change(t, name)
+        return unless t.respond_to?(:through)
+        t.through = !t.through
+      end
+      
+      add_key_handler(K_1){try_change(:through)}
+    end
   end
   
   #####################################################
@@ -879,7 +952,7 @@ module TileSetEditor
   end
   
   @@editing_mode = nil
-  @@editing_controls = {pass: EditPass.new, land: EditLand.new, walk: EditWalk.new}
+  @@editing_controls = {pass: EditPass.new, land: EditLand.new, walk: EditWalk.new, through: EditThrough.new}
   def self.change_mode(mode)
     @@work_area.remove_control(@@editing_controls[@@editing_mode]) if @@editing_controls[@@editing_mode]
     @@editing_mode = mode

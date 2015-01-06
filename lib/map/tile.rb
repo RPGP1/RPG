@@ -766,18 +766,16 @@ module RPG
       
       private
       def set_layer(through: nil, **opt)
-        through = (@info.key?(:through) ? @info[through] : through)
-        @layer = (through ? [nil, nil, nil, self] : [nil, nil, self, :none])
+        @info[:through] = through unless @info.key?(:through)
+        @layer = (@info[:through] ? [nil, nil, nil, self] : [nil, nil, self, :none])
         
         self
       end
       
-      def set_walkable(image, walk: nil, through: nil, **opt)
+      def set_walkable(walk: nil, **opt)
         walk = Direction.new(true) if walk == true #trueならDirection.new(true)
         walk = nil unless Direction === walk #Direction以外のobjectをnilに統一
-        @info[:old_walk] = walk
-        @info[:through] = (through ? true : false)
-        walk ||= Direction.new(true) if through #すり抜けなら歩行可
+        walk ||= Direction.new(true) if @info[:through] #すり抜けなら歩行可
         
         pass = [:float, :plane]
         pass << :walk if walk
@@ -798,11 +796,10 @@ module RPG
         @info[:through]
       end
       def through=(v)
-        bool = (v ? true : false)
-        set_layer(nil, through: bool)
-        set_walkable(nil, through: bool, walk: @info[:old_walk])
+        @info[:through] = (v ? true : false)
+        set_layer
         
-        bool
+        @info[:through]
       end
     end
   end
