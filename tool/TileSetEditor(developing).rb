@@ -36,7 +36,7 @@ module TileSetEditor
       super(0,0,nil,32)
       self.image.bgcolor = WS::COLOR[:base]
       
-      hash = {new: '新規作成', save: '保存', pass: '通行設定', land: '着陸設定', walk: '歩行設定', through: 'すり抜け設定', exit: '終了'}
+      hash = {new: '新規作成', save: '保存', black_white: 'タイル背景色反転', pass: '通行設定', land: '着陸設定', walk: '歩行設定', through: 'すり抜け設定', bush: '茂み属性設定', counter: 'カウンター属性設定', exit: '終了'}
       
       hash.each do |key, caption|
         str = key.to_s
@@ -57,11 +57,23 @@ module TileSetEditor
       
       self.add_handler(:new){TileSetEditor.new_tileset}
       self.add_handler(:save){TileSetEditor.save_tileset}
+      self.add_handler(:black_white){
+        ary = EditModeBase.tile_bgcolor.dup
+        ary2 = ary.pop(3).map!{|i| 255 - i}
+        EditModeBase.tile_bgcolor = ary + ary2
+      }
       self.add_handler(:exit){TileSetEditor.exit_editor}
-      self.add_handler(:pass){TileSetEditor.change_mode(:pass)}
-      self.add_handler(:land){TileSetEditor.change_mode(:land)}
-      self.add_handler(:walk){TileSetEditor.change_mode(:walk)}
-      self.add_handler(:through){TileSetEditor.change_mode(:through)}
+      add_mode(:pass)
+      add_mode(:land)
+      add_mode(:walk)
+      add_mode(:through)
+      add_mode(:bush)
+      add_mode(:counter)
+    end
+    
+    private
+    def add_mode(mode)
+      self.add_handler(mode){TileSetEditor.change_mode(mode)}
     end
   end
   
@@ -335,7 +347,7 @@ module TileSetEditor
         
         def set_image
           @img.dispose if @img
-          @img = Image.new(@width, @height).draw(2, 2, @symbol_img).box(0, 0, @width - 1, @height - 1, C_WHITE)
+          @img = Image.new(@width, @height).draw(2, 2, @symbol_img).box(0, 0, @width - 1, @height - 1, EditModeBase.tile_border_color)
         end
         
         def info_render(&b)
@@ -344,6 +356,8 @@ module TileSetEditor
         end
         
         def render
+          self.image.bgcolor = EditModeBase.tile_bgcolor
+          
           old_img = @symbol_img
           @symbol_img = @tileset.symbol_ary[@index]
           if old_img != @symbol_img
@@ -395,14 +409,6 @@ module TileSetEditor
         @render_range.collision = [0, 0, width - 1, height - 1]
       end
       
-      def bgcolor
-        self.image.bgcolor
-      end
-      
-      def bgcolor=(v)
-        self.image.bgcolor = v
-      end
-      
       def info_render(&b)
         return @info_render unless b
         @children.each do |ctl|
@@ -432,6 +438,8 @@ module TileSetEditor
       end
       
       def render
+        self.image.bgcolor = EditModeBase.tile_bgcolor
+        
         ary = @children#.select(&:visible)
         Sprite.check(@render_range, ary, nil, :render)
         Sprite.check(@render_range, ary, nil, :draw)
@@ -457,14 +465,6 @@ module TileSetEditor
     
     def info_render(&b)
       client.info_render(&b)
-    end
-    
-    def bgcolor
-      client.bgcolor
-    end
-    
-    def bgcolor=(v)
-      client.bgcolor = v
     end
     
     def render
@@ -515,9 +515,9 @@ module TileSetEditor
     end
     
     def render
-      self.image.bgcolor = @viewer.tile_bgcolor
+      self.image.bgcolor = EditModeBase.tile_bgcolor
       
-      self.image.draw_box(0,0,self.image.width - 1, self.image.height - 1, C_WHITE)
+      self.image.draw_box(0,0,self.image.width - 1, self.image.height - 1, EditModeBase.tile_border_color)
       if img = @viewer.symbol_img
         if @scale == 1
           self.image.draw(2, 2, img)
@@ -531,22 +531,30 @@ module TileSetEditor
   end
   
   class EditModeBase < WS::WSLightContainer
-    attr_reader :name, :tile_bgcolor
+    attr_reader :name
     
     @@tile_bgcolor = [0,0,0]
+    @@tile_border_color = [255,255,255]
     
     def self.tile_bgcolor
       @@tile_bgcolor
     end
     def self.tile_bgcolor=(v)
-      @@tile_bgcolor = v
+      @@tile_bgcolor = v.dup
+      ary = v.dup
+      ary2 = ary.pop(3).map{|i| 255 - i}
+      @@tile_border_color = ary + ary2
+      
+      TileSetEditor.refresh_mode
+    end
+    def self.tile_border_color
+      @@tile_border_color
     end
     
     def initialize(name)
       super()
       @name = name
       @focusable = true
-      @tile_bgcolor = @@tile_bgcolor
       
       #ここに本体を入れる
       @main_area = nil
@@ -569,7 +577,6 @@ module TileSetEditor
       @tileset = tileset
       
       tilesetview = add_control(TileSetView.new(tileset), :tilesetview)
-      tilesetview.bgcolor = @tile_bgcolor
       unless old_tileset
         add_handler(:mouse_wheel_up){self.tilesetview.vsb.slide(-self.tilesetview.vsb.shift_qty * 3)}
         add_handler(:mouse_wheel_down){self.tilesetview.vsb.slide(self.tilesetview.vsb.shift_qty * 3)}
@@ -605,10 +612,6 @@ module TileSetEditor
       
       def change(t, name)
       end
-    end
-    
-    def tile_bgcolor=(v)
-      tilesetview.bgcolor = @tile_bgcolor = v
     end
   end
   
@@ -904,6 +907,94 @@ module TileSetEditor
     end
   end
   
+  class EditAttributeBase < EditModeBase
+    class EditAttributeLabel < WS::WSLabel
+      def initialize(viewer, type, caption)
+        @font = @@default_font
+        @default_caption = caption + '：'
+        super(nil,nil,nil, @font.size + 2, @default_caption)
+        
+        @type = type
+        @viewer = viewer
+      end
+      
+      def update
+        tile = @viewer.tile
+        if tile
+          self.caption = @default_caption + (tile.info[:attribute].include?(@type) ? 'On' : 'Off')
+        else
+          self.caption = @default_caption
+        end
+        
+        super
+      end
+    end
+    
+    def initialize(type, name)
+      super(name + '設定')
+      @type = type
+    end
+    
+    def init_editor
+      super
+      
+      timg = @tileset.symbol_ary
+      type = @type
+      tw = timg[0].width
+      th = timg[0].height
+      
+      img_ary = [Image.load('./image/tileseteditor/o.png'), Image.load('./image/tileseteditor/x.png'),]
+      @info_render = Proc.new do
+        img = img_ary[
+          tile.info[:attribute].include?(type) ? 0 : 1
+        ]
+        self.image.draw((self.image.width - img.width) / 2, (self.image.height - img.height) / 2, img)
+      end
+      
+      image1 = EditTilePreview.new(self, tw, th)
+      image2 = EditTilePreview.new(self, tw, th, 3)
+      
+      space_ctl = WS::WSControl.new(nil,nil,nil, 5)
+      
+      label1 = EditAttributeLabel.new(self, @type, @name[0..-3])
+      
+      @main_area = WS::WSLightContainer.new
+      @main_area.add_control(image1)
+      @main_area.add_control(image2)
+      @main_area.add_control(space_ctl)
+      @main_area.add_control(label1)
+      @main_area.layout(:vbox) do
+        self.set_margin 2, 2, 2, 2
+        self.space = 5
+        
+        add image1
+        add image2
+        add space_ctl
+        add label1
+        layout
+      end
+      
+      def change(t, name)
+        ary = t.info[:attribute]
+        ary << @type unless ary.delete(@type)
+      end
+      
+      add_key_handler(K_1){try_change(@type)}
+    end
+  end
+  
+  class EditBush < EditAttributeBase
+    def initialize
+      super(:bush, '茂み属性')
+    end
+  end
+  
+  class EditCounter < EditAttributeBase
+    def initialize
+      super(:counter, 'カウンター属性')
+    end
+  end
+  
   #####################################################
   #   エディタの初期化
   #####################################################
@@ -952,7 +1043,7 @@ module TileSetEditor
   end
   
   @@editing_mode = nil
-  @@editing_controls = {pass: EditPass.new, land: EditLand.new, walk: EditWalk.new, through: EditThrough.new}
+  @@editing_controls = {pass: EditPass.new, land: EditLand.new, walk: EditWalk.new, through: EditThrough.new, bush: EditBush.new, counter: EditCounter.new}
   def self.change_mode(mode)
     @@work_area.remove_control(@@editing_controls[@@editing_mode]) if @@editing_controls[@@editing_mode]
     @@editing_mode = mode
@@ -966,6 +1057,9 @@ module TileSetEditor
       ctl.activate
       ctl.set_tileset(@@editing_tileset)
     end
+  end
+  def self.refresh_mode
+    self.change_mode(@@editing_mode)
   end
   
   #初期化処理
