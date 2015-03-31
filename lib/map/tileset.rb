@@ -503,7 +503,55 @@ module RPG
       end
     end
     
-    class A2 < Base
+    class A2_Field < Base
+      private
+      
+      def set_tile(image)
+        ary = image.sliceTiles(8, 4)
+        
+        4.times do |y|
+          y *= 8
+          2.times do |x|
+            x *= 2
+            ground = create_tile(Tile::Ground, ary[x + y])
+            create_tile(Tile::OnGround, ary[x + y + 1], ground: ground)
+          end
+          
+          4.times do |x|
+            x += 4
+            create_tile(Tile::Decoration, ary[x + y])
+          end
+        end
+        
+        self
+      end
+    end
+    
+    class A2_Area < Base
+      private
+      
+      def set_tile(image)
+        ary = image.sliceTiles(8, 4)
+        
+        4.times do |y|
+          y *= 8
+          3.times do |x|
+            create_tile(Tile::Ground, ary[x + y])
+          end
+          
+          create_tile(Tile::Pavement, ary[3 + y])
+          
+          4.times do |x|
+            x += 4
+            create_tile(Tile::Decoration, ary[x + y])
+          end
+        end
+        
+        self
+      end
+    end
+    
+    class A2_VX < Base
       private
       
       def set_tile(image)
@@ -514,14 +562,12 @@ module RPG
           2.times do |x|
             x *= 3
             ground = create_tile(Tile::Ground, ary[x + y])
-            create_tile(Tile::Bush, ary[x + y + 1])
-            create_tile(Tile::Block, ary[x + y + 2])
+            create_tile(Tile::Bush, ary[x + y + 1], ground: ground)
+            create_tile(Tile::Block, ary[x + y + 2], ground: ground)
           end
           
-          2.times do |x|
-            x += 6
-            create_tile(Tile::Pavement, ary[x + y])
-          end
+          create_tile(Tile::Pavement, ary[6 + y])
+          create_tile(Tile::Counter, ary[7 + y])
         end
         
         self

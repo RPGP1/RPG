@@ -134,9 +134,11 @@ module RPG
       
       #ユーザは追加情報設定で基本はココをいじる
       def set_info(**opt)
-        #defaultでは移動設定のみ
+        #defaultでは移動設定・属性付与・タグ付
         
         set_walkable(**opt)
+        set_attribute(**opt)
+        set_tag(**opt)
         
         self
       end
@@ -162,6 +164,24 @@ module RPG
         @info[:move] = Direction.new(true)
         #:move 地上系のみに影響。移動できる方向のDirection
         #      Directionクラスについては./direction.rbを参照
+        
+        self
+      end
+      
+      def set_attribute(**opt)
+        #属性付与
+        #  梯子 :ladder
+        #  茂み :bush
+        #  カウンター :counter
+        #  ダメージ床 :damage
+        @info[:attribute] = []
+        
+        self
+      end
+      
+      def set_tag(**opt)
+        #地形タグ
+        @info[:tag] = 0
         
         self
       end
@@ -402,7 +422,6 @@ module RPG
         width = part_width * 2
         height = part_height * 2
         
-        @symbol = image.slice(0,0,width,height)
         @image = @@part.map{|part|
           img = Image.new(width, height)
           part.each.with_index{|index, i|
@@ -410,6 +429,7 @@ module RPG
           }
           img
         }
+        @symbol = @image[0]
         
         [@symbol, @image]
       end
@@ -632,12 +652,11 @@ module RPG
     end
     
     class Ground < Base
-      include AutotileTile
       #地面タイル(TileSetA2-A(Left))
+      include AutotileTile
     end
     
-    class Bush < Base
-      #茂みタイル(TileSetA2-A(center))
+    class OnGround < Base
       #ground:に地面タイルが渡されることを想定
       
       include AutotileTile
@@ -646,25 +665,40 @@ module RPG
       def set_layer(ground: nil, **opt)
         @layer = [ground, self, nil, nil]
       end
+    end
+    
+    class Decoration < Base
+      #装飾タイル(TileSetA2-B)
       
+      include AutotileTile
+      
+      private
+      def set_layer(**opt)
+        @layer = [nil, self, nil, nil]
+      end
+    end
+    
+    class Bush < OnGround
+      #VXの茂みタイル(TileSetA2-A(center))
+      #ground:に地面タイルが渡されることを想定
+      
+      private
       def set_walkable(**opt)
         @info[:pass] = [:walk, :float, :plane]
         @info[:land] = []
         @info[:move] = Direction.new(true)
       end
+      
+      def set_attribute(**opt)
+        @info[:attribute] = [:bush]
+      end
     end
     
-    class Block < Base
-      #障害タイル(TileSetA2-A(right))
+    class Block < OnGround
+      #VXの障害タイル(TileSetA2-A(right))
       #ground:に地面タイルが渡されることを想定
       
-      include AutotileTile
-      
       private
-      def set_layer(ground: nil, **opt)
-        @layer = [ground, self, nil, nil]
-      end
-      
       def set_walkable(**opt)
         @info[:pass] = [:float, :plane]
         @info[:land] = []
@@ -683,10 +717,25 @@ module RPG
     
     class Pavement < Base
       include AutotileTile
-      #境界を基本作らないタイル(TileSetA2-B/C)
+      #境界を基本作らないタイル(TileSetA2-A(right;エリアタイプ), VX:TileSetA2-B)
       
       def ===(tile)
         !(Buildings === tile) || (tile.class == self.class)
+      end
+    end
+    
+    class Counter < Pavement
+      #VXのカウンタータイル(VX:TileSetA2-C)
+      
+      private
+      def set_attribute(**opt)
+        @info[:attribute] = [:counter]
+      end
+      
+      def set_walkable(**opt)
+        @info[:pass] = [:float, :plane]
+        @info[:land] = []
+        @info[:move] = Direction.new(true)
       end
     end
     
