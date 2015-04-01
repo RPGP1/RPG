@@ -36,7 +36,7 @@ module TileSetEditor
       super(0,0,nil,32)
       self.image.bgcolor = WS::COLOR[:base]
       
-      hash = {new: '新規作成', save: '保存', black_white: 'タイル背景色反転', pass: '通行設定', land: '着陸設定', walk: '歩行設定', through: 'すり抜け設定', bush: '茂み属性設定', counter: 'カウンター属性設定', exit: '終了'}
+      hash = {new: '新規作成', save: '保存', black_white: 'タイル背景色反転', pass: '通行設定', land: '着陸設定', walk: '歩行設定', through: 'すり抜け設定', ladder: '梯子属性設定', bush: '茂み属性設定', counter: 'カウンター属性設定', damage: 'ダメージ床属性設定', tag: '地形タグ設定', exit: '終了'}
       
       hash.each do |key, caption|
         str = key.to_s
@@ -67,8 +67,11 @@ module TileSetEditor
       add_mode(:land)
       add_mode(:walk)
       add_mode(:through)
+      add_mode(:ladder)
       add_mode(:bush)
       add_mode(:counter)
+      add_mode(:damage)
+      add_mode(:tag)
     end
     
     private
@@ -258,6 +261,7 @@ module TileSetEditor
       WS.release_capture
       WS.capture(@old_capture_object, @old_capture_notify, @old_capture_lock) if @old_capture_object
       super
+      TileSetEditor.refresh_mode
     end
   end
   
@@ -290,6 +294,7 @@ module TileSetEditor
       WS.release_capture
       WS.capture(@old_capture_object, @old_capture_notify, @old_capture_lock) if @old_capture_object
       super
+      TileSetEditor.refresh_mode
     end
     
     def render
@@ -320,7 +325,7 @@ module TileSetEditor
       class TileView < WS::WSControl
         attr_reader :tile, :mouse_over, :symbol_img
         
-        @@alpha_hash = {true => 255, false => 160}
+        @@alpha_hash = {true => 255, false => 186}
         
         def self.alpha_hash
           @@alpha_hash
@@ -983,6 +988,12 @@ module TileSetEditor
     end
   end
   
+  class EditLadder < EditAttributeBase
+    def initialize
+      super(:ladder, '梯子属性')
+    end
+  end
+  
   class EditBush < EditAttributeBase
     def initialize
       super(:bush, '茂み属性')
@@ -992,6 +1003,100 @@ module TileSetEditor
   class EditCounter < EditAttributeBase
     def initialize
       super(:counter, 'カウンター属性')
+    end
+  end
+  
+  class EditDamage < EditAttributeBase
+    def initialize
+      super(:damage, 'ダメージ床属性')
+    end
+  end
+  
+  class EditTag < EditModeBase
+    class EditTagLabel < WS::WSLabel
+      def initialize(viewer)
+        @font = @@default_font
+        super(nil,nil,nil, @font.size + 2, '地形タグ：')
+        
+        @viewer = viewer
+      end
+      
+      def update
+        tile = @viewer.tile
+        if tile
+          self.caption = '地形タグ：' + tile.info[:tag].to_s
+        else
+          self.caption = 'すり抜け：'
+        end
+        
+        super
+      end
+    end
+    
+    def initialize
+      super('地形タグ設定')
+    end
+    
+    def init_editor
+      super
+      
+      timg = @tileset.symbol_ary
+      tw = timg[0].width
+      th = timg[0].height
+      
+      img_ary = Array.new(10){|i| Image.load('./image/tileseteditor/' + i.to_s + '.png')}
+      @info_render = Proc.new do
+        tag = self.tile.info[:tag]
+        img1 = img_ary[tag.div(10)]
+        img2 = img_ary[tag % 10]
+        self.image.draw(self.image.width / 2 - img1.width - 1, (self.image.height - img1.height) / 2, img1)
+        self.image.draw(self.image.width / 2 + 1, (self.image.height - img2.height) / 2, img2)
+      end
+      
+      image1 = EditTilePreview.new(self, tw, th)
+      image2 = EditTilePreview.new(self, tw, th, 3)
+      
+      space_ctl = WS::WSControl.new(nil,nil,nil, 5)
+      
+      label1 = EditTagLabel.new(self)
+      
+      @main_area = WS::WSLightContainer.new
+      @main_area.add_control(image1)
+      @main_area.add_control(image2)
+      @main_area.add_control(space_ctl)
+      @main_area.add_control(label1)
+      @main_area.layout(:vbox) do
+        self.set_margin 2, 2, 2, 2
+        self.space = 5
+        
+        add image1
+        add image2
+        add space_ctl
+        add label1
+        layout
+      end
+      
+      def change(t, name)
+        tag = t.info[:tag]
+        
+        case name
+        when :plus_1
+          tag += 1
+        when :minus_1
+          tag -= 1
+        when :plus_10
+          tag += 10
+        when :minus_10
+          tag -= 10
+        end
+        
+        t.info[:tag] = tag % 100
+      end
+      
+      add_key_handler(K_D){try_change(:plus_1)}
+      add_key_handler(K_A){try_change(:minus_1)}
+      add_key_handler(K_W){try_change(:plus_10)}
+      add_key_handler(K_S){try_change(:minus_10)}
     end
   end
   
@@ -1032,6 +1137,8 @@ module TileSetEditor
     else
       @@exit_popup = nil
     end
+    
+    self.refresh_mode unless start
   end
   
   def self.change_tileset(i)
@@ -1040,10 +1147,11 @@ module TileSetEditor
     if @@editing_tileset != (@@editing_tileset = TileSet.__send__(@@tileset_list[i]))
       @@editing_controls[@@editing_mode].set_tileset(@@editing_tileset) if @@editing_controls[@@editing_mode]
     end
+    self.refresh_mode
   end
   
   @@editing_mode = nil
-  @@editing_controls = {pass: EditPass.new, land: EditLand.new, walk: EditWalk.new, through: EditThrough.new, bush: EditBush.new, counter: EditCounter.new}
+  @@editing_controls = {pass: EditPass.new, land: EditLand.new, walk: EditWalk.new, through: EditThrough.new, ladder: EditLadder.new, bush: EditBush.new, counter: EditCounter.new, damage: EditDamage.new, tag: EditTag.new}
   def self.change_mode(mode)
     @@work_area.remove_control(@@editing_controls[@@editing_mode]) if @@editing_controls[@@editing_mode]
     @@editing_mode = mode
