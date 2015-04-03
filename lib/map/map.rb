@@ -91,6 +91,8 @@ module RPG
           ifo[:pass] = Array.new(height){Array.new(width){[]}}
           ifo[:land] = Array.new(height){Array.new(width){[]}}
           ifo[:move] = Array.new(height){Array.new(width){Direction.new(nil)}}
+          ifo[:attribute] = Array.new(height){Array.new(width){[]}}
+          ifo[:tag] = Array.new(height){Array.new(width){0}}
         end
         
         @loop = {up_down: false, left_right: false}
@@ -155,6 +157,8 @@ module RPG
                 ifo[:pass][y][x] = tile.info[:pass]
                 ifo[:land][y][x] = tile.info[:land]
                 ifo[:move][y][x] = tile.info[:move]
+                ifo[:attribute][y][x] = tile.info[:attribute]
+                ifo[:tag][y][x] = tile.info[:tag]
                 
                 stack_autotile(layer, x, y) if autotile
                 
@@ -166,6 +170,8 @@ module RPG
                 ifo[:pass][y][x] = []
                 ifo[:land][y][x] = []
                 ifo[:move][y][x] = Direction.new(nil)
+                ifo[:attribute][y][x] = []
+                ifo[:tag][y][x] = 0
                 
                 stack_autotile(layer, x, y) if autotile
                 
@@ -186,15 +192,19 @@ module RPG
       end
       
       def draw(tx, ty, target, layer)
-        basex = basey = 0
         image_arr = image_ary
         image_width = image_arr[0].width
         image_height = image_arr[0].height
         
-        startx = (tx + 0.5) * image_width - target.width.fdiv(2)
-        endx = startx + target.width - 1
-        starty = (ty + 0.5) * image_height - target.height.fdiv(2)
-        endy = starty + target.height - 1
+        startx = ((tx + 0.5) * image_width - target.width.fdiv(2)).floor
+        endx = startx + target.width
+        starty = ((ty + 0.5) * image_height - target.height.fdiv(2)).floor
+        endy = starty + target.height
+        
+        basex = (startx < 0 ? 32 : 0) - startx % image_width
+        startx += basex
+        basey = (starty < 0 ? 32 : 0) - starty % image_height
+        starty += basey
         
         limitx = @width * image_width
         limity = @height * image_height
@@ -214,8 +224,8 @@ module RPG
           endy -= image_height
         end
         
-        sizex = ((endx - startx) / image_width).ceil
-        sizey = ((endy - starty) / image_height).ceil
+        sizex = (endx - startx).fdiv(image_width).ceil
+        sizey = (endy - starty).fdiv(image_height).ceil
         
         layer.each do |l|
           target.drawTile(basex, basey, @map[l], image_arr, startx, starty, sizex, sizey, Map.z[l])
@@ -224,10 +234,6 @@ module RPG
       
       def image_ary
         @tileset.image_ary
-      end
-      
-      def symbol_ary
-        @tileset.symbol_ary
       end
       
       def save

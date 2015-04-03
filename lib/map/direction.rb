@@ -83,6 +83,30 @@ module RPG
       [@up, @right, @down, @left][i]
     end
     
+    def &(other)
+      Direction.new(up: self.up? && other.up?,
+                   down: self.down? && other.down?,
+                   left: self.left? && other.left?,
+                   right: self.right? && other.right?,
+                   )
+    end
+    
+    def |(other)
+      Direction.new(up: self.up? || other.up?,
+                   down: self.down? || other.down?,
+                   left: self.left? || other.left?,
+                   right: self.right? || other.right?,
+                   )
+    end
+    
+    def ^(other)
+      Direction.new(up: self.up? ^ other.up?,
+                   down: self.down? ^ other.down?,
+                   left: self.left? ^ other.left?,
+                   right: self.right? ^ other.right?,
+                   )
+    end
+    
     def inspect
       ary = []
       ary << "UP" if @up
